@@ -1,0 +1,119 @@
+
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px;
+    background-color: #f0f0f0;
+}
+
+#game-config, #game-area {
+    border: 1px solid #ccc;
+    padding: 20px;
+    margin-bottom: 20px;
+    width: fit-content;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+#game-config div {
+    margin-bottom: 10px;
+}
+#game-config label {
+    margin-right: 10px;
+}
+#game-config select, #game-config button {
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+#game-config button {
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+}
+#game-config button:hover {
+    background-color: #45a049;
+}
+
+
+#board-container {
+    display: grid; /* Set by JS */
+    border: 2px solid #666;
+    background-color: #dab46b; /* Go board color */
+    margin: 20px auto;
+    box-shadow: 3px 3px 8px #888;
+    width: fit-content;
+    padding: 15px;
+    position: relative;
+}
+
+.intersection {
+    width: 30px;
+    height: 30px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    border-right: 1px solid #997a48;
+    border-bottom: 1px solid #997a48;
+}
+
+.intersection:hover:not(:has(.stone)) {
+    background-color: rgba(0,0,0,0.1);
+}
+
+
+.stone {
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+    position: absolute;
+    left: 10%;
+    top: 10%;
+    box-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+    pointer-events: none;
+}
+
+.stone.BLACK {
+    background-color: black;
+}
+
+.stone.WHITE {
+    background-color: white;
+    border: 0.5px solid #555;
+}
+
+#game-info p, #status-messages p {
+    margin: 5px 0;
+}
+
+#game-controls button {
+    margin: 5px;
+    padding: 8px 15px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    cursor: pointer;
+}
+#pass-turn-btn { background-color: #ffc107; }
+#pass-turn-btn:hover { background-color: #e0a800; }
+#resign-game-btn { background-color: #dc3545; color: white; }
+#resign-game-btn:hover { background-color: #c82333; }
+
+
+.intersection.hoshi::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background-color: #503a1e;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}

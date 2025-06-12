@@ -1,0 +1,68 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baduk (Go) Game</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>Baduk (Go)</h1>
+
+    <div id="game-config">
+        <h2>Game Setup</h2>
+        <div>
+            <label for="board-size">Board Size:</label>
+            <select id="board-size">
+                <option value="9">9x9</option>
+                <option value="13">13x13</option>
+                <option value="19" selected>19x19</option>
+            </select>
+        </div>
+        <div>
+            <label for="game-mode">Game Mode:</label>
+            <select id="game-mode">
+                <option value="hvh" selected>Human vs. Human</option>
+                <option value="hva_b">Human (Black) vs. AI (White)</option>
+                <option value="hva_w">Human (White) vs. AI (Black)</option>
+                <option value="ava">AI vs. AI</option>
+            </select>
+        </div>
+        <div>
+            <label for="ai-difficulty">AI Difficulty (if AI involved):</label>
+            <select id="ai-difficulty">
+                <option value="easy" selected>Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+        </div>
+        <button id="start-game-btn">Start Game</button>
+    </div>
+
+    <div id="game-area" style="display: none;">
+        <div id="game-info">
+            <p>Current Player: <span id="current-player">N/A</span></p>
+            <p>Captures - Black: <span id="captures-black">0</span>, White: <span id="captures-white">0</span></p>
+            <p>Komi: <span id="komi-display">6.5</span></p>
+            <p id="ko-point-display" style="display:none;">Ko Restriction: <span id="ko-point"></span></p>
+            <p id="consecutive-passes-display">Consecutive Passes: <span id="consecutive-passes">0</span></p>
+        </div>
+
+        <div id="board-container">
+            <!-- Board will be rendered here by JavaScript -->
+        </div>
+
+        <div id="game-controls">
+            <button id="pass-turn-btn">Pass Turn</button>
+            <button id="resign-game-btn">Resign Game</button>
+        </div>
+
+        <div id="status-messages">
+            <p id="game-message">Welcome! Set up a game to start.</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
