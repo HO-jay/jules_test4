@@ -63,6 +63,21 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <!-- Rules Section to be inserted here -->
+
+
+<div id="rules-toggle-area" style="margin-top: 20px; text-align: center;">
+    <button id="toggle-rules-btn">Show Game Rules</button>
+</div>
+<div id="rules-container" style="display:none; margin-top:10px; padding:15px; border:1px solid #ddd; background-color:#f9f9f9; max-width: 700px; margin-left:auto; margin-right:auto; text-align:left;">
+    <h3>Basic Rules of Go</h3>
+    <p>Go is a two-player board game. Players take turns placing black and white stones on the board's intersections, with Black playing first. The objective is to control more territory than the opponent by the end of the game.</p>
+    <h4>1. Placing Stones</h4><ul><li>A stone is placed on an empty intersection.</li><li>Once placed, a stone does not move.</li><li>Stones of the same color that are connected horizontally or vertically form a group.</li><li>A group shares liberties, which are the adjacent empty points.</li></ul>
+    <h4>2. Capturing Stones</h4><ul><li>If a group of stones has no liberties (no empty points next to any of the stones), it is captured and removed from the board.</li><li>You can capture an opponent's stones by surrounding them so they have no liberties.</li></ul>
+    <h4>3. Illegal Moves</h4><ul><li><strong>Self-capture (Suicide):</strong> You may not play a move that would cause your own stone or group to have no liberties, UNLESS that specific move simultaneously captures opponent stones which results in your group gaining liberties. If the move is self-capturing and captures no opponent stones, it is illegal.</li><li><strong>Ko rule:</strong> You may not make a move that would recreate the exact same board position that existed one turn earlier after a capture. This prevents infinite loops. (This game implements a common 'simple Ko' rule.)</li></ul>
+    <h4>4. Ending the Game & Scoring</h4><ul><li>A player may choose to pass instead of making a move.</li><li>The game ends when both players pass consecutively.</li><li><strong>Territory Scoring is used:</strong><ul><li>After the game ends, each player's score is calculated.</li><li><strong>Territory:</strong> Empty points surrounded by only your stones count as your territory.</li><li><strong>Captured Stones:</strong> Stones you captured from your opponent during the game are added to your score.</li><li><strong>Komi:</strong> A set number of points (default 6.5 in this game) is added to White's score at the end to compensate for Black playing first.</li></ul></li><li>The player with the higher total score (Territory + Captured Stones + Komi for White) wins the game.</li></ul>
+    <h4>5. Life and Death (Important Note for this Version)</h4><ul><li>Groups with two or more separate "eyes" (internal empty points fully surrounded by that group) are considered alive and generally cannot be captured.</li><li><strong>This game scores the board <em>as it is</em> when the game ends by two passes. It does NOT automatically identify or remove "dead" stones that haven't been captured during play.</strong></li><li>Therefore, players should ensure any groups they believe are "dead" (cannot avoid capture) are actually captured and removed from the board <em>before</em> both players pass, if they want those stones counted as captures and the space they occupied to become territory.</li></ul>
+</div>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

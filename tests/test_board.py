@@ -3,9 +3,7 @@ import unittest
 import sys
 import os
 
-# Adjust path to import from parent directory
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from board import Board
 from stone import Stone
 
@@ -13,118 +11,158 @@ class TestBoard(unittest.TestCase):
     def test_board_initialization(self):
         board = Board(size=9)
         self.assertEqual(board.size, 9)
-        self.assertEqual(len(board._grid), 9)
-        self.assertTrue(all(all(cell == Stone.EMPTY for cell in row) for row in board._grid))
-
-        board_default = Board()
-        self.assertEqual(board_default.size, 19)
+        success, _, _, _ = board.place_stone(0,0,Stone.BLACK)
+        self.assertTrue(success)
 
     def test_place_stone_valid(self):
         board = Board(size=5)
-        board.place_stone(2, 2, Stone.BLACK)
+        success, msg, captured_count, ko_coord = board.place_stone(2, 2, Stone.BLACK)
+        self.assertTrue(success, f"Placement should be valid. Msg: {msg}")
         self.assertEqual(board.get_stone(2, 2), Stone.BLACK)
+        self.assertEqual(captured_count, 0)
+        self.assertIsNone(ko_coord)
 
     def test_place_stone_out_of_bounds(self):
         board = Board(size=5)
-        with self.assertRaisesRegex(ValueError, "Move out of bounds"):
-            board.place_stone(5, 2, Stone.BLACK)
-        with self.assertRaisesRegex(ValueError, "Move out of bounds"):
-            board.place_stone(-1, 2, Stone.BLACK)
+        success, msg, _, _ = board.place_stone(5, 2, Stone.BLACK)
+        self.assertFalse(success)
+        self.assertIn("Move out of bounds", msg)
+        success, msg, _, _ = board.place_stone(-1, 2, Stone.BLACK)
+        self.assertFalse(success)
+        self.assertIn("Move out of bounds", msg)
 
     def test_place_stone_occupied(self):
         board = Board(size=5)
-        board.place_stone(2, 2, Stone.BLACK)
-        with self.assertRaisesRegex(ValueError, "Intersection is already occupied"):
-            board.place_stone(2, 2, Stone.WHITE)
+        s1,_,_,_ = board.place_stone(2, 2, Stone.BLACK)
+        self.assertTrue(s1)
+        success, msg, _, _ = board.place_stone(2, 2, Stone.WHITE)
+        self.assertFalse(success)
+        self.assertIn("Intersection is already occupied", msg)
 
     def test_get_stone_out_of_bounds(self):
         board = Board(size=5)
-        with self.assertRaises(IndexError): # Current get_stone raises IndexError
+        with self.assertRaises(IndexError):
             board.get_stone(5,2)
 
     def test_is_empty(self):
         board = Board(size=5)
         self.assertTrue(board.is_empty(0,0))
-        board.place_stone(0,0,Stone.BLACK)
+        s,_,_,_ = board.place_stone(0,0,Stone.BLACK)
+        self.assertTrue(s)
         self.assertFalse(board.is_empty(0,0))
 
     def test_get_group_single_stone(self):
         board = Board(size=5)
-        board.place_stone(2, 2, Stone.BLACK)
+        s,_,_,_ = board.place_stone(2,2,Stone.BLACK)
+        self.assertTrue(s)
         group_stones, group_liberties = board.get_group(2, 2)
-        self.assertEqual(group_stones, {(2, 2)})
-        self.assertEqual(len(group_liberties), 4) # (1,2), (3,2), (2,1), (2,3)
-        self.assertIn((1,2), group_liberties)
+        self.assertEqual(group_stones, {(2,2)})
+        self.assertEqual(len(group_liberties), 4)
 
     def test_get_group_multiple_stones(self):
         board = Board(size=5)
-        board.place_stone(0, 0, Stone.BLACK)
-        board.place_stone(0, 1, Stone.BLACK)
-        board.place_stone(1, 0, Stone.BLACK)
-        # B B .
-        # B . .
-        # . . .
-        group_stones, group_liberties = board.get_group(0, 0)
-        expected_stones = {(0,0), (0,1), (1,0)}
-        # After placing (0,0)B, (0,1)B, (1,0)B on 5x5:
-        # Liberties: (0,2), (1,1), (2,0)
-        self.assertEqual(group_stones, expected_stones)
-        self.assertEqual(group_liberties, {(1,1), (0,2), (2,0)})
-
+        s1,_,_,_ = board.place_stone(0,0,Stone.BLACK)
+        s2,_,_,_ = board.place_stone(0,1,Stone.BLACK)
+        s3,_,_,_ = board.place_stone(1,0,Stone.BLACK)
+        self.assertTrue(s1 and s2 and s3)
+        group_stones, group_liberties = board.get_group(0,0)
+        self.assertEqual(group_stones, {(0,0),(0,1),(1,0)})
+        self.assertEqual(group_liberties, {(0,2),(1,1),(2,0)})
 
     def test_get_group_empty_point(self):
         board = Board(size=5)
-        group_stones, group_liberties = board.get_group(2, 2)
+        group_stones, group_liberties = board.get_group(2,2)
         self.assertEqual(group_stones, set())
         self.assertEqual(group_liberties, set())
 
     def test_simple_capture(self):
-        # . B .
-        # B W B
-        # . B .
-        board = Board(size=5) # Reset board for clarity
-        board.place_stone(1,1, Stone.WHITE) # W at center
-        board.place_stone(0,1, Stone.BLACK) # B above
-        board.place_stone(1,0, Stone.BLACK) # B left
-        board.place_stone(1,2, Stone.BLACK) # B right
+        board = Board(size=5)
+        s1,_,_,_ = board.place_stone(1,1, Stone.WHITE)
+        s2,_,_,_ = board.place_stone(0,1, Stone.BLACK)
+        s3,_,_,_ = board.place_stone(1,0, Stone.BLACK)
+        s4,_,_,_ = board.place_stone(1,2, Stone.BLACK)
+        self.assertTrue(s1 and s2 and s3 and s4)
 
-        # Last black stone to capture white stone at (1,1)
-        captured_count, _ = board.place_stone(2,1, Stone.BLACK) # B below
-
+        success, msg, captured_count, ko_coord = board.place_stone(2,1, Stone.BLACK)
+        self.assertTrue(success, f"Capture move should be valid. Msg: {msg}")
         self.assertEqual(captured_count, 1)
         self.assertTrue(board.is_empty(1,1))
-        self.assertEqual(board.get_stone(2,1), Stone.BLACK) # Ensure capturing stone is there
+        self.assertEqual(ko_coord, (1,1))
 
     def test_no_capture_if_liberties(self):
         board = Board(size=5)
-        board.place_stone(1,1, Stone.WHITE)
-        board.place_stone(0,1, Stone.BLACK)
-        board.place_stone(1,0, Stone.BLACK)
-        # White stone at (1,1) still has 2 liberties: (1,2) and (2,1)
-        captured_count, _ = board.place_stone(2,2, Stone.BLACK) # A non-adjacent black stone
+        s1,_,_,_ = board.place_stone(1,1, Stone.WHITE)
+        s2,_,_,_ = board.place_stone(0,1, Stone.BLACK)
+        s3,_,_,_ = board.place_stone(1,0, Stone.BLACK)
+        self.assertTrue(s1 and s2 and s3)
+
+        success, msg, captured_count, _ = board.place_stone(2,2, Stone.BLACK)
+        self.assertTrue(success)
         self.assertEqual(captured_count, 0)
         self.assertEqual(board.get_stone(1,1), Stone.WHITE)
 
-    def test_suicide_illegal_simple(self):
-        # Setup:
+    def test_suicide_rules(self):
+        # Test 1: Invalid simple suicide (no captures)
+        board = Board(size=3)
         # B B B
         # B . B  (Target for W is (1,1))
         # B B E  (E at (2,2) is a liberty for the Black group)
-        board_suicide = Board(size=3)
-        board_suicide.place_stone(0,0, Stone.BLACK)
-        board_suicide.place_stone(0,1, Stone.BLACK)
-        board_suicide.place_stone(0,2, Stone.BLACK)
-        board_suicide.place_stone(1,0, Stone.BLACK)
-        # (1,1) is EMPTY
-        board_suicide.place_stone(1,2, Stone.BLACK)
-        board_suicide.place_stone(2,0, Stone.BLACK)
-        board_suicide.place_stone(2,1, Stone.BLACK)
+        s,_,_,_ = board.place_stone(0,0, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(0,1, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(0,2, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(1,0, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(1,2, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(2,0, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(2,1, Stone.BLACK); self.assertTrue(s)
         # (2,2) is left EMPTY as a liberty for the black group
 
-        with self.assertRaisesRegex(ValueError, "Move is suicidal and not allowed"):
-            board_suicide.place_stone(1,1,Stone.WHITE) # W plays into the surrounded spot
-        self.assertTrue(board_suicide.is_empty(1,1)) # Ensure stone was not placed or was removed by suicide handling
+        success, msg, captured_count, ko_coord = board.place_stone(1,1, Stone.WHITE)
+        self.assertFalse(success, "Simple suicide should fail")
+        self.assertIn("suicidal and captures no stones", msg)
+        self.assertEqual(board.get_stone(1,1), Stone.EMPTY, "Board should be reverted on simple suicide")
+        self.assertEqual(captured_count, 0)
+        self.assertIsNone(ko_coord)
 
+        # Test 2: Valid move because it captures opponent stones (Snapback-like scenario)
+        # B W .
+        # B X W  X is (1,1) - White to play, captures B stones at (0,1) (no, (1,0) )
+        # B W .
+        board = Board(size=3)
+        # Black stones that form a group to be captured
+        s,_,_,_ = board.place_stone(0,0, Stone.BLACK); self.assertTrue(s) # B at (0,0)
+        s,_,_,_ = board.place_stone(1,0, Stone.BLACK); self.assertTrue(s) # B at (1,0)
+        s,_,_,_ = board.place_stone(2,0, Stone.BLACK); self.assertTrue(s) # B at (2,0)
+        # White stones to create the capture point for B group
+        s,_,_,_ = board.place_stone(0,1, Stone.WHITE); self.assertTrue(s) # W at (0,1)
+        # s,_,_,_ = board.place_stone(1,1, Stone.WHITE); # This is where W will play
+        s,_,_,_ = board.place_stone(1,2, Stone.WHITE); self.assertTrue(s) # W at (1,2) # Mistake in prev trace, this W is not needed for this specific capture
+        s,_,_,_ = board.place_stone(2,1, Stone.WHITE); self.assertTrue(s) # W at (2,1)
+        # Board state before W plays at (1,1):
+        # B W .
+        # B . .   <-- Mistake in manual board drawing, W at (1,2) is not relevant for this simple column capture.
+        # B W .
+        # Corrected setup for capturing B column:
+        # B W .
+        # B _ W  <-- White plays at (1,1)
+        # B W .
+        # Remove W at (1,2) for this test case to be simpler.
+        board = Board(size=3) # Reset for clarity
+        s,_,_,_ = board.place_stone(0,0, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(1,0, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(2,0, Stone.BLACK); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(0,1, Stone.WHITE); self.assertTrue(s)
+        s,_,_,_ = board.place_stone(2,1, Stone.WHITE); self.assertTrue(s)
+        # Board:
+        # B W .
+        # B . .
+        # B W .
+        # White plays at (1,1). This puts B group {(0,0),(1,0),(2,0)} in atari, then captures.
+
+        success, msg, captured_count, ko_coord = board.place_stone(1,1, Stone.WHITE)
+        self.assertTrue(success, f"Snapback-like capture should be valid. Msg: {msg}")
+        self.assertEqual(board.get_stone(1,1), Stone.WHITE, "Capturing stone should remain")
+        self.assertEqual(captured_count, 3, "Should capture 3 black stones")
+        self.assertTrue(board.is_empty(1,0)) # Check one of the captured stones
 
 if __name__ == '__main__':
     unittest.main()

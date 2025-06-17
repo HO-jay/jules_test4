@@ -31,21 +31,12 @@ class Game:
         else:
             self.current_player = Stone.BLACK
 
-    def calculate_area_scores(self) -> dict | None:
+    def calculate_territory_scores(self):
         if not self.game_over:
-            # print("Game is not over yet. Scores can only be calculated at the end.") # Less verbose
-            return None
+            pass
 
-        scores = {Stone.BLACK: 0, Stone.WHITE: 0}
+        territory_points = {Stone.BLACK: 0, Stone.WHITE: 0}
         visited_empty_points = set()
-
-        for r in range(self.board.size):
-            for c in range(self.board.size):
-                stone = self.board.get_stone(r, c)
-                if stone == Stone.BLACK:
-                    scores[Stone.BLACK] += 1
-                elif stone == Stone.WHITE:
-                    scores[Stone.WHITE] += 1
 
         for r_start in range(self.board.size):
             for c_start in range(self.board.size):
@@ -58,10 +49,8 @@ class Game:
                     while q:
                         curr_r, curr_c = q.pop(0)
                         current_empty_region.add((curr_r, curr_c))
-
                         for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                             nr, nc = curr_r + dr, curr_c + dc
-
                             if self.board._is_valid_coordinate(nr, nc):
                                 neighbor_stone = self.board.get_stone(nr, nc)
                                 if neighbor_stone == Stone.EMPTY:
@@ -72,64 +61,75 @@ class Game:
                                     border_colors.add(neighbor_stone)
 
                     visited_empty_points.update(current_empty_region)
-
                     if len(border_colors) == 1:
                         owner = list(border_colors)[0]
-                        scores[owner] += len(current_empty_region)
-        scores[Stone.WHITE] += self.komi
-        self.final_scores = scores
-        # print(f"Final Scores (Area Scoring, Komi={self.komi}): BLACK: {scores[Stone.BLACK]}, WHITE: {scores[Stone.WHITE]}") # Less verbose for lib
-        return scores
+                        territory_points[owner] += len(current_empty_region)
 
-    def pass_turn(self) -> bool:
+        black_total_score = territory_points[Stone.BLACK] + self.captures[Stone.BLACK]
+        white_total_score = territory_points[Stone.WHITE] + self.captures[Stone.WHITE] + self.komi
+
+        self.final_scores = {
+            Stone.BLACK: {'total': black_total_score, 'territory': territory_points[Stone.BLACK], 'captures': self.captures[Stone.BLACK]},
+            Stone.WHITE: {'total': white_total_score, 'territory': territory_points[Stone.WHITE], 'captures': self.captures[Stone.WHITE], 'komi_added': self.komi}
+        }
+
+    def pass_turn(self) -> tuple[bool, str]:
         if self.game_over:
-            # print("Game is already over.") # Less verbose for lib
-            return False
+            return False, "Game is already over."
 
+        passed_player_name = self.current_player.name
         self.consecutive_passes += 1
         self.ko_restriction_point = None
-        print(f"{self.current_player.name} passed.") # This print is fine for TUI interaction
 
+        message = f"Player {passed_player_name} passed. "
         if self.consecutive_passes >= 2:
             self.game_over = True
-            print("Both players passed consecutively. Game over.")
-            self.calculate_area_scores()
+            self.calculate_territory_scores()
+            message += "Both players passed consecutively. Game over."
         else:
             self.switch_player()
-        return True
+            message += f"{self.current_player.name}'s turn."
+        return True, message
 
-    def make_move(self, row: int, col: int) -> bool:
+    def make_move(self, row: int, col: int) -> tuple[bool, str]:
         if self.game_over:
-            # print("Game is over. No more moves allowed.") # Less verbose for lib
-            return False
+            return False, "Game is over. No more moves allowed."
 
         if self.ko_restriction_point is not None and self.ko_restriction_point == (row, col):
-            # print(f"Invalid move at ({row},{col}): Illegal due to Ko rule. Point {self.ko_restriction_point} is restricted.") # Less verbose
-            return False
+            return False, f"Invalid move at ({row},{col}): Illegal due to Ko rule. Point {self.ko_restriction_point} is restricted."
 
-        try:
-            captured_count, captured_single_stone_coord = self.board.place_stone(row, col, self.current_player)
-            self.captures[self.current_player] += captured_count
+        success, board_message, captured_count, captured_single_stone_coord = self.board.place_stone(row, col, self.current_player)
 
-            if captured_count == 1 and captured_single_stone_coord is not None:
-                self.ko_restriction_point = captured_single_stone_coord
-            else:
-                self.ko_restriction_point = None
+        if not success:
+            return False, board_message
 
-            self.consecutive_passes = 0
-            self.switch_player()
-            return True
-        except ValueError as e:
-            # print(f"Invalid move at ({row},{col}): {e}") # Less verbose for lib
-            self.ko_restriction_point = None # Ensure Ko cleared on any invalid move error
-            return False
-        except IndexError as e:
-            # print(f"Error making move at ({row},{col}): {e}") # Less verbose for lib
+        player_making_move = self.current_player
+        print(f"DEBUG_GAME: make_move by {player_making_move} (id: {id(player_making_move)})")
+        print(f"DEBUG_GAME: Stone.BLACK id: {id(Stone.BLACK)}, Stone.WHITE id: {id(Stone.WHITE)}")
+        print(f"DEBUG_GAME: Before update: self.captures = {self.captures}, captured_count = {captured_count}")
+
+        if player_making_move not in self.captures:
+            self.captures[player_making_move] = 0
+            print(f"DEBUG_GAME: WARNING - Initialized captures for {player_making_move} in make_move")
+
+        self.captures[player_making_move] += captured_count
+        print(f"DEBUG_GAME: After update: self.captures = {self.captures}")
+
+        self.consecutive_passes = 0
+
+        if captured_count == 1 and captured_single_stone_coord is not None:
+            self.ko_restriction_point = captured_single_stone_coord
+        else:
             self.ko_restriction_point = None
-            return False
+
+        self.switch_player()
+
+        success_message = f"Move by {player_making_move.name} at ({row},{col}) successful."
+        if captured_count > 0:
+            success_message += f" Captured {captured_count} stone(s)."
+        return True, success_message
 
     def get_board_display_string(self) -> str:
-        # ... (content as before, assumed correct) ...
         display_str = "   " + " ".join([f"{i:2}" for i in range(self.board.size)]) + "\n"
         for r_idx, row_data in enumerate(self.board._grid):
             display_str += f"{r_idx:2} "
@@ -139,29 +139,36 @@ class Game:
                 elif stone == Stone.BLACK: row_str.append("B")
                 elif stone == Stone.WHITE: row_str.append("W")
             display_str += "  ".join(row_str) + "\n"
-        if self.ko_restriction_point:
+        if self.ko_restriction_point and not self.game_over:
             display_str += f"Ko restriction at: {self.ko_restriction_point}\n"
         if self.game_over:
             display_str += "\nGAME OVER\n"
         return display_str
 
-
     def get_scores(self) -> dict:
         if self.final_scores:
             return {
-                "black_score": self.final_scores.get(Stone.BLACK, 0),
-                "white_score": self.final_scores.get(Stone.WHITE, 0),
-                "komi": self.komi,
-                "game_over": self.game_over
+                'black_score_total': self.final_scores[Stone.BLACK]['total'],
+                'black_score_territory': self.final_scores[Stone.BLACK]['territory'],
+                'black_score_captures': self.final_scores[Stone.BLACK]['captures'],
+                'white_score_total': self.final_scores[Stone.WHITE]['total'],
+                'white_score_territory': self.final_scores[Stone.WHITE]['territory'],
+                'white_score_captures': self.final_scores[Stone.WHITE]['captures'],
+                'komi_applied': self.final_scores[Stone.WHITE]['komi_added'],
+                'game_over': self.game_over,
+                'scoring_method': 'Territory'
             }
         else:
             return {
-                "black_captures": self.captures[Stone.BLACK],
-                "white_captures": self.captures[Stone.WHITE],
-                "komi": self.komi,
-                "game_over": self.game_over,
-                "current_player": self.current_player.name, # Keep for TUI
-                "status": "Scores not yet calculated (game may not be over)"
+                'black_captures_current': self.captures[Stone.BLACK],
+                'white_captures_current': self.captures[Stone.WHITE],
+                'komi_setting': self.komi,
+                'game_over': self.game_over,
+                'current_player': self.current_player.name,
+                'ko_restriction_point': self.ko_restriction_point,
+                'consecutive_passes': self.consecutive_passes,
+                'status': 'Game in progress or scores not yet calculated.',
+                'scoring_method': 'Territory'
             }
 
     def get_current_ai_player(self) -> AIOpponent | None:
@@ -171,18 +178,10 @@ class Game:
             return self.ai_white
         return None
 
-    def request_ai_move(self):
-        """
-        If the current player is an AI, this method gets a move from the AI,
-        validates it by trying to play it. If AI's choice is invalid (e.g., suicidal),
-        this version relies on AI to pick a non-suicidal one from candidates or pass.
-        If AI passes or has no valid moves, game.pass_turn() is called.
-        """
+    def request_ai_move(self) -> tuple[bool, str]:
         ai_player_instance = self.get_current_ai_player()
         if not ai_player_instance or self.game_over:
-            return False
-
-        print(f"AI ({self.current_player.name}) is thinking (Difficulty: {ai_player_instance.difficulty})...")
+            return False, "Not AI's turn or game over."
 
         candidate_coords = []
         for r in range(self.board.size):
@@ -191,66 +190,51 @@ class Game:
                     candidate_coords.append((r, c))
 
         if not candidate_coords:
-            print(f"AI ({ai_player_instance.ai_stone_color.name}) found no candidate spots and passes.")
-            self.pass_turn()
-            return True
+            return self.pass_turn()
 
         chosen_move = ai_player_instance.get_move(candidate_coords, self.board)
 
         if chosen_move is None:
-            print(f"AI ({ai_player_instance.ai_stone_color.name}) chooses to pass.")
-            self.pass_turn()
-            return True
+            return self.pass_turn()
 
         r_move, c_move = chosen_move
-        # The AI's get_move should ideally return a move that it knows is not suicidal.
-        # The make_move method will raise ValueError for suicidal moves, which should be handled by TUI or calling logic.
-        # For AI, if it picks a suicidal move (despite its internal check), it's an AI flaw.
-        # The Game's make_move will prevent it.
-        if self.make_move(r_move, c_move):
-            # Successful move by AI. TUI will print board. Game class should not print AI's move directly.
-            # print(f"AI ({ai_player_instance.ai_stone_color.name}) played at {chosen_move}") # This is TUI's job
-            return True
-        else:
-            # This implies the AI's chosen move was invalid (e.g. suicidal, or Ko if AI didn't check Ko, but Game does)
-            # make_move would have printed the error.
-            print(f"AI ({ai_player_instance.ai_stone_color.name}) selected move {chosen_move} which was ultimately invalid. AI passes.")
-            self.pass_turn()
-            return True
+        return self.make_move(r_move, c_move)
 
 if __name__ == '__main__':
-    # ... (main block as it was after previous AI integration, or a simplified one for brevity) ...
-    print("\n--- Basic Game Run with AI (Example) ---")
+    print("\n--- Basic Game Run with AI (Territory Scoring Example) ---")
     game = Game(5, player_white_is_ai=True, ai_difficulty="medium")
 
-    # Example game play
-    human_moves = [(0,0), (1,1), (2,2), (3,3), (4,4)] # Example moves for Black (Human)
-    for i in range(5): # Limit turns for this example
+    human_moves = [(0,0), (1,1), (2,2), (3,0)]
+    current_player_is_human = True
+
+    for i in range(10):
         if game.game_over: break
+        print(f"Turn {i+1}. Player: {game.current_player.name}")
 
-        # Human (Black) turn
-        if game.current_player == Stone.BLACK and not game.player_black_is_ai:
-            if i < len(human_moves):
-                r,c = human_moves[i]
-                print(f"Player BLACK (Human) plays at ({r},{c})")
-                game.make_move(r,c)
-                print(game.get_board_display_string())
-            else: # Human ran out of scripted moves, pass
-                print("Player BLACK (Human) passes.")
-                game.pass_turn()
+        success, message = False, ""
+        if game.get_current_ai_player():
+            print(f"AI ({game.current_player.name}) is thinking...")
+            success, message = game.request_ai_move()
+            print(f"AI action: {message}")
+        else:
+            if human_moves:
+                r,c = human_moves.pop(0)
+                print(f"Human ({game.current_player.name}) plays at ({r},{c})")
+                success, message = game.make_move(r,c)
+                print(f"Human move result: {message}")
+            else:
+                print(f"Human ({game.current_player.name}) passes (no more scripted moves).")
+                success, message = game.pass_turn()
+                print(f"Human pass result: {message}")
 
-        if game.game_over: break
-
-        # AI (White) turn
-        if game.current_player == Stone.WHITE and game.player_white_is_ai:
-            print("Requesting AI White's move...")
-            game.request_ai_move()
-            print(game.get_board_display_string())
+        if not success:
+            print(f"Move attempt failed. Message: {message}")
 
     if not game.game_over:
-        print("\nGame example finished by turn limit.")
-        game.game_over = True # Force game over to see scores
-        game.calculate_area_scores()
+        print("\nGame example finished by turn limit or error.")
+        game.game_over = True
+        game.calculate_territory_scores()
 
+    print(game.get_board_display_string())
     final_scores = game.get_scores()
     print(f"Final scores: {final_scores}")

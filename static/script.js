@@ -18,31 +18,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const komiDisplayEl = document.getElementById('komi-display');
     const koPointDisplayEl = document.getElementById('ko-point-display');
     const koPointEl = document.getElementById('ko-point');
-    const consecutivePassesDisplayEl = document.getElementById('consecutive-passes-display');
     const consecutivePassesEl = document.getElementById('consecutive-passes');
 
     const passTurnBtn = document.getElementById('pass-turn-btn');
     const resignGameBtn = document.getElementById('resign-game-btn');
 
+    // Rules display elements
+    const toggleRulesBtn = document.getElementById('toggle-rules-btn');
+    const rulesContainer = document.getElementById('rules-container');
+
     let currentGameData = null;
     let isProcessingAction = false;
 
     function updateUI(gameData) {
-        if (!gameData) return;
+        if (!gameData) { console.error('updateUI called with no gameData'); return; }
+        // console.log('Updating UI with gameData:', gameData);
         currentGameData = gameData;
 
         renderBoard(gameData.board, gameData.board_size);
 
         let playerText = gameData.current_player;
-        if (gameData.is_current_player_ai) {
+        if (gameData.is_current_player_ai && !gameData.game_over) {
             playerText += " (AI)";
-        } else if (!gameData.game_over) {
+        } else if (!gameData.is_current_player_ai && !gameData.game_over) {
             playerText += " (Human)";
         }
         currentPlayerEl.textContent = playerText;
 
-        capturesBlackEl.textContent = gameData.captures.BLACK;
-        capturesWhiteEl.textContent = gameData.captures.WHITE;
+        if (gameData.game_over && gameData.final_scores_detailed) {
+            capturesBlackEl.textContent = gameData.final_scores_detailed.BLACK.captures;
+            capturesWhiteEl.textContent = gameData.final_scores_detailed.WHITE.captures;
+        } else if (gameData.captures_display) {
+            capturesBlackEl.textContent = gameData.captures_display.BLACK;
+            capturesWhiteEl.textContent = gameData.captures_display.WHITE;
+        } else {
+            capturesBlackEl.textContent = "0";
+            capturesWhiteEl.textContent = "0";
+        }
+
         komiDisplayEl.textContent = gameData.komi;
 
         if (gameData.ko_restriction_point) {
@@ -59,26 +72,21 @@ document.addEventListener('DOMContentLoaded', () => {
             gameConfigDiv.style.display = 'block';
             passTurnBtn.disabled = true;
             resignGameBtn.disabled = true;
-            let finalMessage = gameData.message || "Game Over. ";
-            if (gameData.winner && !finalMessage.includes("Winner:") && !finalMessage.includes("Draw")) {
-                finalMessage += `Winner: ${gameData.winner}. `;
-            }
-            if (gameData.final_scores && !finalMessage.includes("Scores -")) {
-                 finalMessage += `Scores - BLACK: ${gameData.final_scores.BLACK}, WHITE: ${gameData.final_scores.WHITE}.`;
-            }
-            statusMessageEl.textContent = finalMessage;
+            boardContainer.classList.add('game-over');
         } else {
             gameConfigDiv.style.display = 'none';
             gameAreaDiv.style.display = 'block';
-            passTurnBtn.disabled = gameData.is_current_player_ai;
-            resignGameBtn.disabled = gameData.is_current_player_ai;
+            const humanTurn = !gameData.is_current_player_ai && !isProcessingAction;
+            passTurnBtn.disabled = !humanTurn;
+            resignGameBtn.disabled = !humanTurn;
+            boardContainer.classList.remove('game-over');
         }
         isProcessingAction = false;
     }
 
     function renderBoard(boardGrid, boardSize) {
         boardContainer.innerHTML = '';
-        const cellSize = Math.max(20, Math.floor(400 / boardSize));
+        const cellSize = Math.max(20, Math.floor(Math.min(window.innerWidth * 0.8, window.innerHeight * 0.5) / boardSize) );
         boardContainer.style.gridTemplateColumns = `repeat(${boardSize}, ${cellSize}px)`;
         boardContainer.style.gridTemplateRows = `repeat(${boardSize}, ${cellSize}px)`;
         boardContainer.style.width = `${boardSize * cellSize}px`;
@@ -110,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     stoneDiv.classList.add('stone', stoneType);
                     intersection.appendChild(stoneDiv);
                 } else {
-                    if (!currentGameData || (!currentGameData.game_over && !currentGameData.is_current_player_ai)) {
+                    if (currentGameData && !currentGameData.game_over && !currentGameData.is_current_player_ai) {
                          intersection.addEventListener('click', handleIntersectionClick);
                     } else {
                         intersection.style.cursor = 'default';
@@ -123,11 +131,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleApiCall(endpoint, method = 'POST', body = null) {
         if (isProcessingAction && method === 'POST') {
-            console.warn("Action already in progress.");
+            statusMessageEl.textContent = "Previous action still processing. Please wait.";
             return;
         }
         isProcessingAction = true;
         statusMessageEl.textContent = "Processing...";
+        passTurnBtn.disabled = true;
+        resignGameBtn.disabled = true;
+
         try {
             const options = { method };
             if (body) {
@@ -145,36 +156,58 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(`Error with ${endpoint}:`, error);
             statusMessageEl.textContent = `Error: ${error.message}`;
             isProcessingAction = false;
+            if(currentGameData && !currentGameData.game_over) {
+                const humanTurn = !currentGameData.is_current_player_ai;
+                passTurnBtn.disabled = !humanTurn;
+                resignGameBtn.disabled = !humanTurn;
+            } else if (!currentGameData) { // If error happened before game even started
+                 passTurnBtn.disabled = true; resignGameBtn.disabled = true;
+            }
         }
     }
 
     async function handleIntersectionClick(event) {
-        if (isProcessingAction) return;
+        if (isProcessingAction || (currentGameData && currentGameData.is_current_player_ai)) return;
         const row = event.currentTarget.dataset.row;
         const col = event.currentTarget.dataset.col;
         await handleApiCall(`${API_BASE_URL}/move`, 'POST', { row: parseInt(row), col: parseInt(col) });
     }
 
     startGameBtn.addEventListener('click', () => {
-        const size = parseInt(boardSizeSelect.value);
-        const mode = gameModeSelect.value;
-        const difficulty = aiDifficultySelect.value;
-        handleApiCall(`${API_BASE_URL}/start`, 'POST', { board_size: size, mode: mode, ai_difficulty: difficulty });
+        handleApiCall(`${API_BASE_URL}/start`, 'POST', {
+            board_size: parseInt(boardSizeSelect.value),
+            mode: gameModeSelect.value,
+            ai_difficulty: aiDifficultySelect.value
+        });
     });
 
     passTurnBtn.addEventListener('click', () => {
-        if (isProcessingAction) return;
+        if (isProcessingAction || (currentGameData && currentGameData.is_current_player_ai)) return;
         handleApiCall(`${API_BASE_URL}/pass`, 'POST');
     });
 
     resignGameBtn.addEventListener('click', () => {
-        if (isProcessingAction) return;
+        if (isProcessingAction && (currentGameData && currentGameData.is_current_player_ai)) return; // AI cannot resign via button
         if (!confirm("Are you sure you want to resign?")) {
-            isProcessingAction = false;
             return;
         }
         handleApiCall(`${API_BASE_URL}/resign`, 'POST');
     });
+
+    // Rules Toggle Functionality
+    if (toggleRulesBtn && rulesContainer) {
+        toggleRulesBtn.addEventListener('click', () => {
+            if (rulesContainer.style.display === 'none') {
+                rulesContainer.style.display = 'block';
+                toggleRulesBtn.textContent = 'Hide Game Rules';
+            } else {
+                rulesContainer.style.display = 'none';
+                toggleRulesBtn.textContent = 'Show Game Rules';
+            }
+        });
+    } else {
+        console.warn("Rules toggle button or container not found.");
+    }
 
     gameAreaDiv.style.display = 'none';
     gameConfigDiv.style.display = 'block';
